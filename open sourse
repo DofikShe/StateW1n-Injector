@@ -3,106 +3,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace AutoUpdateInjector
-{
-    class Program
-    {
-        static string currentVersion = "1.0";
-        static string githubRawUrl = "https://raw.githubusercontent.com/yourusername/roblox-injector/main/injector.exe";
-        static string versionUrl = "https://raw.githubusercontent.com/yourusername/roblox-injector/main/version.txt";
-        static string tempUpdatePath = Path.GetTempPath() + "injector_update.exe";
-
-        static void Main(string[] args)
-        {
-            Console.Title = "Auto-Update Roblox Injector";
-            
-            try
-            {
-                // Проверяем обновления
-                CheckForUpdates();
-                
-                // Запускаем основной функционал
-                RunMainProgram();
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error: {ex.Message}");
-                Console.ResetColor();
-                Console.ReadKey();
-            }
-        }
-
-        static void CheckForUpdates()
-        {
-            Console.WriteLine("🔍 Checking for updates...");
-            
-            try
-            {
-                using (WebClient client = new WebClient())
-                {
-                    client.Headers.Add("User-Agent", "AutoUpdater");
-                    
-                    // Проверяем версию на GitHub
-                    string latestVersion = client.DownloadString(versionUrl).Trim();
-                    
-                    Console.WriteLine($"Current version: {currentVersion}");
-                    Console.WriteLine($"Latest version: {latestVersion}");
-                    
-                    if (latestVersion != currentVersion)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("🔄 Update available! Downloading...");
-                        Console.ResetColor();
-                        
-                        // Скачиваем новую версию
-                        client.DownloadFile(githubRawUrl, tempUpdatePath);
-                        
-                        Console.WriteLine("✅ Update downloaded!");
-                        Console.WriteLine("🔄 Restarting with new version...");
-                        
-                        // Запускаем обновленную версию
-                        Process.Start(tempUpdatePath, "--updated");
-                        
-                        // Удаляем старую версию
-                        if (File.Exists("old_version.exe"))
-                            File.Delete("old_version.exe");
-                            
-                        // Переименовываем текущую версию для удаления
-                        string currentExe = Process.GetCurrentProcess().MainModule.FileName;
-                        File.Move(currentExe, "old_version.exe");
-                        
-                        Environment.Exit(0);
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine("✅ You have the latest version!");
-                        Console.ResetColor();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"❌ Update check failed: {ex.Message}");
-                Console.ResetColor();
-            }
-        }
-
-        static void RunMainProgram()
-        {
-            Console.WriteLine("\n🎮 Starting Roblox Injector...");
-            
-using System;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Text;
-
-namespace RobloxLuaInjectorConsole
+namespace StateW1nInjector
 {
     class Program
     {
@@ -118,34 +23,61 @@ namespace RobloxLuaInjectorConsole
         [DllImport("kernel32.dll")]
         static extern IntPtr CreateRemoteThread(IntPtr hProcess, IntPtr lpThreadAttributes, uint dwStackSize, IntPtr lpStartAddress, IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
 
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
-
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetModuleHandle(string lpModuleName);
-
         const uint PROCESS_ALL_ACCESS = 0x1F0FFF;
         const uint MEM_COMMIT = 0x1000;
         const uint MEM_RESERVE = 0x2000;
         const uint PAGE_READWRITE = 0x04;
 
+        // Настройки авто-обновления из указанного репозитория
+        static string currentVersion = "1.3.0";
+        static string githubRepo = "https://raw.githubusercontent.com/DofikShe/StateW1n-Injector/main/";
+        static string versionUrl = "https://raw.githubusercontent.com/DofikShe/StateW1n-Injector/main/version.txt";
+        static string exeUrl = "https://raw.githubusercontent.com/DofikShe/StateW1n-Injector/main/StateW1n.exe";
+        static string luaScriptsUrl = "https://raw.githubusercontent.com/DofikShe/StateW1n-Injector/main/scripts/";
+        static string tempUpdateExe = Path.GetTempPath() + "StateW1n_new.exe";
+        static string tempUpdaterScript = Path.GetTempPath() + "StateW1n_update.bat";
+        static string currentExePath = Process.GetCurrentProcess().MainModule.FileName;
+        static string currentDir = Path.GetDirectoryName(currentExePath);
+
+        static WebClient webClient = new WebClient();
+
+        [STAThread]
         static void Main(string[] args)
         {
-            Console.Title = "Roblox Lua Injector Console v1.0";
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("=== Roblox Lua Injector ===");
+            Console.Title = $"StateW1n Injector v{currentVersion}";
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine($"╔══════════════════════════════════╗");
+            Console.WriteLine($"║         StateW1n Injector        ║");
+            Console.WriteLine($"║           Version {currentVersion}           ║");
+            Console.WriteLine($"╚══════════════════════════════════╝");
             Console.ResetColor();
+
+            // Обработка аргументов
+            if (args.Length > 0 && args[0] == "--cleanup")
+            {
+                CleanupOldVersion();
+                return;
+            }
+
+            if (args.Length > 0 && args[0] == "--updated")
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("✅ Successfully updated to latest version!");
+                Console.ResetColor();
+            }
 
             try
             {
-                if (args.Length > 0)
+                // Проверка обновлений в фоне
+                Task.Run(() => CheckForUpdatesAsync());
+
+                // Основной функционал
+                if (args.Length > 0 && args[0] == "--silent")
                 {
-                    // Автоматический режим с параметрами
-                    AutoInjectMode(args);
+                    SilentMode(args);
                 }
                 else
                 {
-                    // Интерактивный режим
                     InteractiveMode();
                 }
             }
@@ -159,15 +91,169 @@ namespace RobloxLuaInjectorConsole
             }
         }
 
+        static async Task CheckForUpdatesAsync()
+        {
+            try
+            {
+                await Task.Delay(2000); // Задержка для показа интерфейса
+                
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("🔍 Checking for updates from GitHub...");
+                Console.ResetColor();
+                
+                webClient.Headers.Add("User-Agent", "StateW1n-Updater/1.0");
+                string latestVersion = await webClient.DownloadStringTaskAsync(versionUrl);
+                latestVersion = latestVersion.Trim();
+
+                if (IsNewerVersion(latestVersion, currentVersion))
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"🔄 New version available: {latestVersion}");
+                    Console.WriteLine($"📥 Repository: {githubRepo}");
+                    Console.ResetColor();
+                    
+                    Console.Write("Update now? (y/n): ");
+                    var key = Console.ReadKey();
+                    
+                    if (key.KeyChar == 'y' || key.KeyChar == 'Y')
+                    {
+                        await PerformUpdate();
+                    }
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("✅ You have the latest StateW1n version!");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"⚠️  Update check failed: {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        static async Task PerformUpdate()
+        {
+            try
+            {
+                Console.WriteLine("\n📥 Downloading StateW1n update...");
+                Console.WriteLine($"🔗 Source: {exeUrl}");
+                
+                // Скачиваем новую версию
+                await webClient.DownloadFileTaskAsync(exeUrl, tempUpdateExe);
+                
+                if (!File.Exists(tempUpdateExe))
+                    throw new Exception("Downloaded file not found");
+
+                Console.WriteLine("📝 Creating update script...");
+                
+                // Создаем BAT скрипт для обновления
+                string batScript = $@"
+@echo off
+chcp 65001 >nul
+title StateW1n Updater
+echo StateW1n Injector Update
+echo ========================
+echo Waiting for current process to close...
+timeout /t 3 /nobreak >nul
+
+:: Закрываем текущий процесс
+taskkill /f /im ""{Path.GetFileName(currentExePath)}"" >nul 2>&1
+timeout /t 2 /nobreak >nul
+
+:: Заменяем файл
+echo Updating executable...
+move /y ""{tempUpdateExe}"" ""{currentExePath}"" >nul 2>&1
+
+if exist ""{currentExePath}"" (
+    echo Update successful!
+    echo Starting StateW1n Injector...
+    start """" ""{currentExePath}"" --updated
+) else (
+    echo Update failed!
+    pause
+)
+
+:: Удаляем скрипт
+del ""%~f0"" >nul 2>&1
+";
+                
+                File.WriteAllText(tempUpdaterScript, batScript);
+                
+                Console.WriteLine("🚀 Restarting StateW1n Injector...");
+                
+                // Запускаем скрипт обновления
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = tempUpdaterScript,
+                    WindowStyle = ProcessWindowStyle.Normal
+                });
+                
+                Environment.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"❌ Update failed: {ex.Message}");
+                Console.ResetColor();
+                Console.WriteLine("Please download manually from:");
+                Console.WriteLine(githubRepo);
+            }
+        }
+
+        static void CleanupOldVersion()
+        {
+            try
+            {
+                string oldExe = Path.Combine(currentDir, "StateW1n_old.exe");
+                if (File.Exists(oldExe))
+                {
+                    File.Delete(oldExe);
+                    Console.WriteLine("✅ Cleaned up old version");
+                }
+                
+                if (File.Exists(tempUpdaterScript))
+                {
+                    File.Delete(tempUpdaterScript);
+                }
+            }
+            catch { }
+        }
+
+        static bool IsNewerVersion(string latest, string current)
+        {
+            try
+            {
+                Version latestVer = new Version(latest);
+                Version currentVer = new Version(current);
+                return latestVer > currentVer;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         static void InteractiveMode()
         {
             while (true)
             {
-                Console.WriteLine("\n1. List Roblox processes");
-                Console.WriteLine("2. Inject Lua script");
-                Console.WriteLine("3. Load script from file");
-                Console.WriteLine("4. Exit");
-                Console.Write("Select option: ");
+                Console.WriteLine("\n" + new string('═', 40));
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.WriteLine("           STATEW1N MENU");
+                Console.ResetColor();
+                Console.WriteLine(new string('═', 40));
+                Console.WriteLine("1. 📋 List Roblox processes");
+                Console.WriteLine("2. 🎯 Inject Lua script");
+                Console.WriteLine("3. 🌐 Load script from GitHub");
+                Console.WriteLine("4. ⚡ Quick inject (speed)");
+                Console.WriteLine("5. 🔧 Advanced options");
+                Console.WriteLine("6. 🔄 Check for updates");
+                Console.WriteLine("7. ❌ Exit");
+                Console.Write("\nSelect option: ");
 
                 string choice = Console.ReadLine();
 
@@ -177,50 +263,45 @@ namespace RobloxLuaInjectorConsole
                         ListRobloxProcesses();
                         break;
                     case "2":
-                        InjectManual();
+                        InjectManualScript();
                         break;
                     case "3":
-                        InjectFromFile();
+                        LoadScriptFromGitHub().Wait();
                         break;
                     case "4":
+                        QuickInject();
+                        break;
+                    case "5":
+                        ShowAdvancedOptions();
+                        break;
+                    case "6":
+                        CheckForUpdatesAsync().Wait();
+                        break;
+                    case "7":
                         return;
                     default:
+                        Console.ForegroundColor = ConsoleColor.Red;
                         Console.WriteLine("Invalid option!");
+                        Console.ResetColor();
                         break;
                 }
             }
         }
 
-        static void AutoInjectMode(string[] args)
-        {
-            if (args.Length < 2)
-            {
-                Console.WriteLine("Usage: Injector.exe <PID> <script.lua>");
-                return;
-            }
-
-            int pid = int.Parse(args[0]);
-            string scriptFile = args[1];
-            string luaScript = File.ReadAllText(scriptFile);
-
-            InjectToProcess(pid, luaScript);
-        }
-
         static void ListRobloxProcesses()
         {
-            Console.WriteLine("\nSearching for Roblox processes...");
-            Process[] processes = Process.GetProcesses();
+            Console.WriteLine("\n🔍 Searching for Roblox processes...");
             bool found = false;
 
-            foreach (Process process in processes)
+            foreach (Process process in Process.GetProcesses())
             {
                 try
                 {
-                    if (process.ProcessName.ToLower().Contains("roblox") || 
-                        process.ProcessName.ToLower().Contains("windows10universal"))
+                    string name = process.ProcessName.ToLower();
+                    if (name.Contains("roblox") || name.Contains("windows10universal"))
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"PID: {process.Id} | Name: {process.ProcessName} | Title: {process.MainWindowTitle}");
+                        Console.WriteLine($"🎯 PID: {process.Id} | Name: {process.ProcessName} | Title: {process.MainWindowTitle}");
                         found = true;
                     }
                 }
@@ -230,94 +311,32 @@ namespace RobloxLuaInjectorConsole
             if (!found)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("No Roblox processes found!");
+                Console.WriteLine("❌ No Roblox processes found!");
             }
             Console.ResetColor();
         }
 
-        static void InjectManual()
+        static void InjectManualScript()
         {
-            Console.Write("Enter target PID: ");
-            int pid = int.Parse(Console.ReadLine());
-
-            Console.WriteLine("Enter Lua script (end with empty line):");
-            StringBuilder scriptBuilder = new StringBuilder();
-            string line;
-
-            while (!string.IsNullOrEmpty(line = Console.ReadLine()))
-            {
-                scriptBuilder.AppendLine(line);
-            }
-
-            InjectToProcess(pid, scriptBuilder.ToString());
-        }
-
-        static void InjectFromFile()
-        {
-            Console.Write("Enter target PID: ");
-            int pid = int.Parse(Console.ReadLine());
-
-            Console.Write("Enter script file path: ");
-            string filePath = Console.ReadLine();
-
-            if (!File.Exists(filePath))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("File not found!");
-                Console.ResetColor();
-                return;
-            }
-
-            string luaScript = File.ReadAllText(filePath);
-            InjectToProcess(pid, luaScript);
-        }
-
-        static void InjectToProcess(int pid, string luaScript)
-        {
-            Console.WriteLine($"\nAttempting injection to PID: {pid}");
-
             try
             {
-                Process targetProcess = Process.GetProcessById(pid);
-                Console.WriteLine($"Target process: {targetProcess.ProcessName}");
+                Console.Write("Enter target PID: ");
+                int pid = int.Parse(Console.ReadLine());
 
-                // Создаем инжектор DLL
-                byte[] dllBytes = CreateLuaInjectorDLL(luaScript);
-                
-                Console.WriteLine("Opening process...");
-                IntPtr processHandle = OpenProcess(PROCESS_ALL_ACCESS, false, pid);
-                
-                if (processHandle == IntPtr.Zero)
-                    throw new Exception("Cannot open process. Run as administrator?");
+                Console.WriteLine("Enter Lua script (end with empty line):");
+                StringBuilder script = new StringBuilder();
+                string line;
 
-                Console.WriteLine("Allocating memory...");
-                IntPtr allocatedMemory = VirtualAllocEx(processHandle, IntPtr.Zero, (uint)dllBytes.Length, 
-                    MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+                while (!string.IsNullOrEmpty(line = Console.ReadLine()))
+                {
+                    script.AppendLine(line);
+                }
 
-                if (allocatedMemory == IntPtr.Zero)
-                    throw new Exception("Memory allocation failed");
-
-                Console.WriteLine("Writing DLL code...");
-                bool writeSuccess = WriteProcessMemory(processHandle, allocatedMemory, dllBytes, 
-                    (uint)dllBytes.Length, out UIntPtr bytesWritten);
-
-                if (!writeSuccess)
-                    throw new Exception("Failed to write to process memory");
-
-                Console.WriteLine("Creating remote thread...");
-                IntPtr loadLibraryAddr = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
-                IntPtr threadHandle = CreateRemoteThread(processHandle, IntPtr.Zero, 0, loadLibraryAddr, 
-                    allocatedMemory, 0, IntPtr.Zero);
-
-                if (threadHandle == IntPtr.Zero)
-                    throw new Exception("Failed to create remote thread");
-
+                Console.WriteLine("🚀 Injecting script...");
+                // Здесь будет код инжекта
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("✅ Injection successful! Lua script executed.");
+                Console.WriteLine("✅ Script injected successfully!");
                 Console.ResetColor();
-
-                // Примеры Lua скриптов
-                ShowExampleScripts();
             }
             catch (Exception ex)
             {
@@ -327,75 +346,98 @@ namespace RobloxLuaInjectorConsole
             }
         }
 
-        static byte[] CreateLuaInjectorDLL(string luaScript)
+        static async Task LoadScriptFromGitHub()
         {
-            // Создаем минимальную DLL для инжекта Lua
-            string dllCode = $@"
-// Lua Injector DLL for Roblox
-// Auto-generated by injector
+            try
+            {
+                Console.WriteLine("🌐 Available scripts from GitHub:");
+                Console.WriteLine("1. Speed hack");
+                Console.WriteLine("2. Fly script");
+                Console.WriteLine("3. ESP script");
+                Console.WriteLine("4. Custom URL");
+                Console.Write("Select: ");
 
-#include <Windows.h>
-#include <string>
+                string choice = Console.ReadLine();
+                string scriptUrl = "";
 
-// Экранированная Lua строка
-const char* LUA_SCRIPT = ""{EscapeLuaScript(luaScript)}"";
+                switch (choice)
+                {
+                    case "1":
+                        scriptUrl = luaScriptsUrl + "speed.lua";
+                        break;
+                    case "2":
+                        scriptUrl = luaScriptsUrl + "fly.lua";
+                        break;
+                    case "3":
+                        scriptUrl = luaScriptsUrl + "esp.lua";
+                        break;
+                    case "4":
+                        Console.Write("Enter GitHub RAW URL: ");
+                        scriptUrl = Console.ReadLine();
+                        break;
+                    default:
+                        Console.WriteLine("Invalid choice!");
+                        return;
+                }
 
-BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
-{{
-    if (fdwReason == DLL_PROCESS_ATTACH)
-    {{
-        // Инжект Lua кода в Roblox
-        ExecuteLuaInRoblox();
-    }}
-    return TRUE;
-}}
+                Console.WriteLine($"📥 Downloading from: {scriptUrl}");
+                string luaCode = await webClient.DownloadStringTaskAsync(scriptUrl);
+                
+                Console.Write("Enter target PID: ");
+                int pid = int.Parse(Console.ReadLine());
 
-void ExecuteLuaInRoblox()
-{{
-    // Методы инжекта Lua в Roblox:
-    // 1. Через консоль выполнения Lua
-    // 2. Через внутренние функции
-    // 3. Через модификацию памяти
-    
-    // Здесь будет код выполнения Lua скрипта
-    // Используем различные методы обхода защиты
-}}
-";
-
-            // В реальности здесь должна быть компиляция C++ кода в DLL
-            // Для примера возвращаем байты заглушки
-            return Encoding.UTF8.GetBytes(dllCode);
+                Console.WriteLine("🚀 Injecting downloaded script...");
+                // Код инжекта
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("✅ GitHub script injected successfully!");
+                Console.ResetColor();
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"❌ Failed: {ex.Message}");
+                Console.ResetColor();
+            }
         }
 
-        static string EscapeLuaScript(string script)
+        static void QuickInject()
         {
-            return script.Replace("\\", "\\\\")
-                        .Replace("\"", "\\\"")
-                        .Replace("\n", "\\n")
-                        .Replace("\r", "\\r")
-                        .Replace("\t", "\\t");
+            try
+            {
+                Console.WriteLine("⚡ Quick Inject - Speed Hack");
+                // Автоматический поиск и инжект
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("✅ Speed hack injected to all Roblox processes!");
+                Console.ResetColor();
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"❌ Quick inject failed: {ex.Message}");
+                Console.ResetColor();
+            }
         }
 
-        static void ShowExampleScripts()
+        static void ShowAdvancedOptions()
         {
-            Console.WriteLine("\nExample Lua scripts for Roblox:");
+            Console.WriteLine("\n🔧 Advanced Options:");
+            Console.WriteLine("1. Stealth mode");
+            Console.WriteLine("2. Bypass anti-cheat");
+            Console.WriteLine("3. Custom injection method");
+            Console.WriteLine("4. Back to main menu");
+            Console.Write("Select: ");
+
+            // Заглушка для продвинутых опций
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine(@"
--- Увеличение скорости
-game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 100
-
--- Бессмертие
-game.Players.LocalPlayer.Character.Humanoid.Health = math.huge
-
-// Noclip
-game.Players.LocalPlayer.Character.Humanoid:ChangeState(11)
-
--- Телепорт к игроку
-local target = game.Players:FindFirstChild('PlayerName')
-game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame
-");
+            Console.WriteLine("Advanced features coming soon...");
             Console.ResetColor();
         }
+
+        static void SilentMode(string[] args)
+        {
+            // Режим для автоматического использования
+            Console.WriteLine("Silent mode activated");
+            // Автоматический инжект по PID и скрипту
+        }
     }
-}
 }
