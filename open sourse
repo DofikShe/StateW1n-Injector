@@ -43,7 +43,6 @@ namespace StateW1nInjector
         {
             Console.Title = $"StateW1n Injector v{currentVersion}";
             
-            // Синий градиент для заголовка
             DrawGradientHeader();
             
             if (args.Length > 0 && args[0] == "--cleanup")
@@ -84,7 +83,6 @@ namespace StateW1nInjector
 
         static void DrawGradientHeader()
         {
-            // Градиент от темно-синего к голубому
             ConsoleColor[] gradientColors = {
                 ConsoleColor.DarkBlue,
                 ConsoleColor.Blue,
@@ -115,15 +113,13 @@ namespace StateW1nInjector
             Console.WriteLine("│           MAIN MENU                │");
             Console.WriteLine("├────────────────────────────────────┤");
             
-            // Синий градиент для пунктов меню
             ConsoleColor[] menuColors = { ConsoleColor.DarkBlue, ConsoleColor.Blue, ConsoleColor.Cyan };
             string[] menuItems = {
                 "1. Scan Roblox Processes",
-                "2. Inject Lua Script",
+                "2. Inject Lua Script", 
                 "3. Quick Auto-Inject",
-                "4. System Information",
-                "5. Check for Updates",
-                "6. Exit"
+                "4. Check for Updates",
+                "5. Exit"
             };
 
             for (int i = 0; i < menuItems.Length; i++)
@@ -328,12 +324,9 @@ del ""%~f0"" >nul 2>&1
                         QuickInject();
                         break;
                     case "4":
-                        ShowSystemInfo();
-                        break;
-                    case "5":
                         CheckForUpdatesAsync().Wait();
                         break;
-                    case "6":
+                    case "5":
                         return;
                     default:
                         Console.ForegroundColor = ConsoleColor.Red;
@@ -468,28 +461,6 @@ del ""%~f0"" >nul 2>&1
                 Console.WriteLine("│ No Roblox processes found".PadRight(38) + "│");
             }
             
-            Console.ForegroundColor = ConsoleColor.Blue;
-            Console.WriteLine("└────────────────────────────────────┘");
-            Console.ResetColor();
-            Console.WriteLine("\nPress any key to continue...");
-            Console.ReadKey();
-        }
-
-        static void ShowSystemInfo()
-        {
-            Console.ForegroundColor = ConsoleColor.Blue;
-            Console.WriteLine("\n┌────────────────────────────────────┐");
-            Console.WriteLine("│       SYSTEM INFORMATION           │");
-            Console.WriteLine("├────────────────────────────────────┤");
-            Console.ResetColor();
-
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"│ Version: {currentVersion}".PadRight(38) + "│");
-            Console.WriteLine($"│ OS: {Environment.OSVersion}".PadRight(38) + "│");
-            Console.WriteLine($"│ User: {Environment.UserName}".PadRight(38) + "│");
-            Console.WriteLine($"│ Machine: {Environment.MachineName}".PadRight(38) + "│");
-            Console.WriteLine($"│ Directory: {currentDir}".PadRight(38) + "│");
-
             Console.ForegroundColor = ConsoleColor.Blue;
             Console.WriteLine("└────────────────────────────────────┘");
             Console.ResetColor();
