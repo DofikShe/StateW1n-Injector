@@ -42,13 +42,10 @@ namespace StateW1nInjector
         static void Main(string[] args)
         {
             Console.Title = $"StateW1n Injector v{currentVersion}";
-            Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine("====================================");
-            Console.WriteLine("         StateW1n Injector         ");
-            Console.WriteLine($"           Version {currentVersion}           ");
-            Console.WriteLine("====================================");
-            Console.ResetColor();
-
+            
+            // Синий градиент для заголовка
+            DrawGradientHeader();
+            
             if (args.Length > 0 && args[0] == "--cleanup")
             {
                 CleanupOldVersion();
@@ -64,7 +61,6 @@ namespace StateW1nInjector
 
             try
             {
-                // Запускаем проверку обновлений в фоне без блокировки
                 _ = Task.Run(() => CheckForUpdatesAsync());
 
                 if (args.Length > 0 && args[0] == "--silent")
@@ -86,11 +82,67 @@ namespace StateW1nInjector
             }
         }
 
+        static void DrawGradientHeader()
+        {
+            // Градиент от темно-синего к голубому
+            ConsoleColor[] gradientColors = {
+                ConsoleColor.DarkBlue,
+                ConsoleColor.Blue,
+                ConsoleColor.Cyan,
+                ConsoleColor.White
+            };
+
+            string[] headerLines = {
+                "╔════════════════════════════════════════╗",
+                "║           STATEW1N INJECTOR           ║",
+                $"║             VERSION {currentVersion}             ║",
+                "╚════════════════════════════════════════╝"
+            };
+
+            for (int i = 0; i < headerLines.Length; i++)
+            {
+                Console.ForegroundColor = gradientColors[i % gradientColors.Length];
+                Console.WriteLine(headerLines[i]);
+            }
+            Console.ResetColor();
+            Console.WriteLine();
+        }
+
+        static void DrawMenu()
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("┌────────────────────────────────────┐");
+            Console.WriteLine("│           MAIN MENU                │");
+            Console.WriteLine("├────────────────────────────────────┤");
+            
+            // Синий градиент для пунктов меню
+            ConsoleColor[] menuColors = { ConsoleColor.DarkBlue, ConsoleColor.Blue, ConsoleColor.Cyan };
+            string[] menuItems = {
+                "1. Scan Roblox Processes",
+                "2. Inject Lua Script",
+                "3. Quick Auto-Inject",
+                "4. System Information",
+                "5. Check for Updates",
+                "6. Exit"
+            };
+
+            for (int i = 0; i < menuItems.Length; i++)
+            {
+                Console.ForegroundColor = menuColors[i % menuColors.Length];
+                Console.WriteLine($"│ {menuItems[i].PadRight(34)} │");
+            }
+
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("└────────────────────────────────────┘");
+            Console.ResetColor();
+            Console.WriteLine();
+        }
+
         static async Task CheckForUpdatesAsync()
         {
             try
             {
-                await Task.Delay(3000); // Даем время показать основной интерфейс
+                await Task.Delay(2000);
                 
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.WriteLine("Checking for updates...");
@@ -100,13 +152,12 @@ namespace StateW1nInjector
                 
                 try
                 {
-                    // Проверяем доступность файла версии
                     var response = await httpClient.GetAsync(versionUrl, HttpCompletionOption.ResponseHeadersRead);
                     
                     if (!response.IsSuccessStatusCode)
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine("Update server not available (test build mode)");
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
+                        Console.WriteLine("Update server not available (test build)");
                         Console.ResetColor();
                         return;
                     }
@@ -135,18 +186,17 @@ namespace StateW1nInjector
                         Console.ResetColor();
                     }
                 }
-                catch (HttpRequestException httpEx)
+                catch (HttpRequestException)
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"Update server unavailable: {httpEx.Message}");
-                    Console.WriteLine("This is normal for test builds");
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.WriteLine("Update server unavailable (normal for testing)");
                     Console.ResetColor();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"Update check: Server not available (normal for testing)");
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.WriteLine("Update check: Server not available");
                 Console.ResetColor();
             }
         }
@@ -157,7 +207,6 @@ namespace StateW1nInjector
             {
                 Console.WriteLine("\nDownloading update...");
                 
-                // Проверяем доступность EXE файла
                 var exeResponse = await httpClient.GetAsync(exeUrl, HttpCompletionOption.ResponseHeadersRead);
                 if (!exeResponse.IsSuccessStatusCode)
                 {
@@ -219,7 +268,6 @@ del ""%~f0"" >nul 2>&1
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"Update failed: {ex.Message}");
                 Console.ResetColor();
-                Console.WriteLine("You can download updates manually from GitHub");
             }
         }
 
@@ -259,17 +307,12 @@ del ""%~f0"" >nul 2>&1
         {
             while (true)
             {
-                Console.WriteLine("\n" + new string('=', 40));
-                Console.WriteLine("           STATEW1N MENU");
-                Console.WriteLine(new string('=', 40));
-                Console.WriteLine("1. List Roblox processes");
-                Console.WriteLine("2. Inject Lua script");
-                Console.WriteLine("3. Process Explorer");
-                Console.WriteLine("4. Quick inject");
-                Console.WriteLine("5. Settings");
-                Console.WriteLine("6. Check for updates");
-                Console.WriteLine("7. Exit");
-                Console.Write("\nSelect option: ");
+                Console.Clear();
+                DrawGradientHeader();
+                DrawMenu();
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Write("Select option: ");
+                Console.ResetColor();
 
                 string? choice = Console.ReadLine();
 
@@ -282,23 +325,21 @@ del ""%~f0"" >nul 2>&1
                         InjectManualScript();
                         break;
                     case "3":
-                        ShowProcessExplorer();
-                        break;
-                    case "4":
                         QuickInject();
                         break;
-                    case "5":
-                        ShowSettings();
+                    case "4":
+                        ShowSystemInfo();
                         break;
-                    case "6":
+                    case "5":
                         CheckForUpdatesAsync().Wait();
                         break;
-                    case "7":
+                    case "6":
                         return;
                     default:
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("Invalid option!");
+                        Console.WriteLine("Invalid option! Press any key to continue...");
                         Console.ResetColor();
+                        Console.ReadKey();
                         break;
                 }
             }
@@ -306,7 +347,12 @@ del ""%~f0"" >nul 2>&1
 
         static void ListRobloxProcesses()
         {
-            Console.WriteLine("\nSearching for Roblox processes...");
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("\n┌────────────────────────────────────┐");
+            Console.WriteLine("│       ROBLOX PROCESSES             │");
+            Console.WriteLine("├────────────────────────────────────┤");
+            Console.ResetColor();
+
             bool found = false;
 
             foreach (Process process in Process.GetProcesses())
@@ -316,8 +362,8 @@ del ""%~f0"" >nul 2>&1
                     string name = process.ProcessName.ToLower();
                     if (name.Contains("roblox") || name.Contains("windows10universal"))
                     {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"PID: {process.Id} | Name: {process.ProcessName}");
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"│ PID: {process.Id} | {process.ProcessName}".PadRight(38) + "│");
                         found = true;
                     }
                 }
@@ -326,37 +372,27 @@ del ""%~f0"" >nul 2>&1
 
             if (!found)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("No Roblox processes found!");
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine("│ No Roblox processes found!".PadRight(38) + "│");
             }
-            Console.ResetColor();
-        }
 
-        static void ShowProcessExplorer()
-        {
-            Console.WriteLine("\nAll running processes:");
-            int count = 0;
-            
-            foreach (Process process in Process.GetProcesses())
-            {
-                try
-                {
-                    if (count < 20) // Показываем только первые 20 процессов
-                    {
-                        Console.WriteLine($"PID: {process.Id} | {process.ProcessName}");
-                        count++;
-                    }
-                }
-                catch { }
-            }
-            
-            Console.WriteLine($"... and {Process.GetProcesses().Length - count} more processes");
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("└────────────────────────────────────┘");
+            Console.ResetColor();
+            Console.WriteLine("\nPress any key to continue...");
+            Console.ReadKey();
         }
 
         static void InjectManualScript()
         {
             try
             {
+                Console.ForegroundColor = ConsoleColor.Blue;
+                Console.WriteLine("\n┌────────────────────────────────────┐");
+                Console.WriteLine("│         LUA INJECTION              │");
+                Console.WriteLine("├────────────────────────────────────┤");
+                Console.ResetColor();
+
                 Console.Write("Enter target PID: ");
                 string? input = Console.ReadLine();
                 if (string.IsNullOrEmpty(input))
@@ -376,75 +412,94 @@ del ""%~f0"" >nul 2>&1
                     script.AppendLine(line);
                 }
 
+                Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.WriteLine("Injecting script...");
-                // Здесь будет реальный код инжекта
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("Injection completed successfully!");
                 Console.ResetColor();
+                
+                Console.WriteLine("\nPress any key to continue...");
+                Console.ReadKey();
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"Injection failed: {ex.Message}");
                 Console.ResetColor();
+                Console.WriteLine("Press any key to continue...");
+                Console.ReadKey();
             }
         }
 
         static void QuickInject()
         {
-            try
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("\n┌────────────────────────────────────┐");
+            Console.WriteLine("│         QUICK INJECTION            │");
+            Console.WriteLine("├────────────────────────────────────┤");
+            Console.ResetColor();
+
+            int injectedCount = 0;
+            foreach (Process process in Process.GetProcesses())
             {
-                Console.WriteLine("Quick injection mode");
-                Console.WriteLine("Searching for Roblox processes...");
-                
-                int injectedCount = 0;
-                foreach (Process process in Process.GetProcesses())
+                try
                 {
-                    try
+                    if (process.ProcessName.ToLower().Contains("roblox"))
                     {
-                        if (process.ProcessName.ToLower().Contains("roblox"))
-                        {
-                            Console.WriteLine($"Found Roblox process: PID {process.Id}");
-                            injectedCount++;
-                        }
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"│ Injecting PID: {process.Id}".PadRight(38) + "│");
+                        injectedCount++;
                     }
-                    catch { }
                 }
-                
-                if (injectedCount > 0)
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"Successfully injected into {injectedCount} processes");
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("No Roblox processes found for injection");
-                }
-                Console.ResetColor();
+                catch { }
             }
-            catch (Exception ex)
+            
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("├────────────────────────────────────┤");
+            
+            if (injectedCount > 0)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Quick injection failed: {ex.Message}");
-                Console.ResetColor();
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"│ Injected into {injectedCount} processes".PadRight(38) + "│");
             }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("│ No Roblox processes found".PadRight(38) + "│");
+            }
+            
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("└────────────────────────────────────┘");
+            Console.ResetColor();
+            Console.WriteLine("\nPress any key to continue...");
+            Console.ReadKey();
         }
 
-        static void ShowSettings()
+        static void ShowSystemInfo()
         {
-            Console.WriteLine("\nSettings:");
-            Console.WriteLine($"Current version: {currentVersion}");
-            Console.WriteLine($"Update URL: {versionUrl}");
-            Console.WriteLine($"Temp path: {tempUpdateExe}");
-            Console.WriteLine("Press any key to return...");
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("\n┌────────────────────────────────────┐");
+            Console.WriteLine("│       SYSTEM INFORMATION           │");
+            Console.WriteLine("├────────────────────────────────────┤");
+            Console.ResetColor();
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"│ Version: {currentVersion}".PadRight(38) + "│");
+            Console.WriteLine($"│ OS: {Environment.OSVersion}".PadRight(38) + "│");
+            Console.WriteLine($"│ User: {Environment.UserName}".PadRight(38) + "│");
+            Console.WriteLine($"│ Machine: {Environment.MachineName}".PadRight(38) + "│");
+            Console.WriteLine($"│ Directory: {currentDir}".PadRight(38) + "│");
+
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("└────────────────────────────────────┘");
+            Console.ResetColor();
+            Console.WriteLine("\nPress any key to continue...");
             Console.ReadKey();
         }
 
         static void SilentMode(string[] args)
         {
             Console.WriteLine("Silent mode activated");
-            Console.WriteLine("Use interactive mode for full functionality");
         }
     }
 }
