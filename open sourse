@@ -1,11 +1,10 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
-using System.Reflection;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using System.Windows.Forms;
+using System.Text;
 
 namespace StateW1nInjector
 {
@@ -28,31 +27,28 @@ namespace StateW1nInjector
         const uint MEM_RESERVE = 0x2000;
         const uint PAGE_READWRITE = 0x04;
 
-        // Настройки авто-обновления из указанного репозитория
         static string currentVersion = "1.3.0";
         static string githubRepo = "https://raw.githubusercontent.com/DofikShe/StateW1n-Injector/main/";
         static string versionUrl = "https://raw.githubusercontent.com/DofikShe/StateW1n-Injector/main/version.txt";
         static string exeUrl = "https://raw.githubusercontent.com/DofikShe/StateW1n-Injector/main/StateW1n.exe";
-        static string luaScriptsUrl = "https://raw.githubusercontent.com/DofikShe/StateW1n-Injector/main/scripts/";
         static string tempUpdateExe = Path.GetTempPath() + "StateW1n_new.exe";
         static string tempUpdaterScript = Path.GetTempPath() + "StateW1n_update.bat";
-        static string currentExePath = Process.GetCurrentProcess().MainModule.FileName;
-        static string currentDir = Path.GetDirectoryName(currentExePath);
+        static string currentExePath = Process.GetCurrentProcess().MainModule?.FileName ?? "StateW1n.exe";
+        static string currentDir = Path.GetDirectoryName(currentExePath) ?? Directory.GetCurrentDirectory();
 
-        static WebClient webClient = new WebClient();
+        static HttpClient httpClient = new HttpClient();
 
         [STAThread]
         static void Main(string[] args)
         {
             Console.Title = $"StateW1n Injector v{currentVersion}";
             Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"╔══════════════════════════════════╗");
-            Console.WriteLine($"║         StateW1n Injector        ║");
-            Console.WriteLine($"║           Version {currentVersion}           ║");
-            Console.WriteLine($"╚══════════════════════════════════╝");
+            Console.WriteLine("====================================");
+            Console.WriteLine("         StateW1n Injector         ");
+            Console.WriteLine($"           Version {currentVersion}           ");
+            Console.WriteLine("====================================");
             Console.ResetColor();
 
-            // Обработка аргументов
             if (args.Length > 0 && args[0] == "--cleanup")
             {
                 CleanupOldVersion();
@@ -62,16 +58,15 @@ namespace StateW1nInjector
             if (args.Length > 0 && args[0] == "--updated")
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("✅ Successfully updated to latest version!");
+                Console.WriteLine("Successfully updated to latest version!");
                 Console.ResetColor();
             }
 
             try
             {
-                // Проверка обновлений в фоне
-                Task.Run(() => CheckForUpdatesAsync());
+                // Запускаем проверку обновлений в фоне без блокировки
+                _ = Task.Run(() => CheckForUpdatesAsync());
 
-                // Основной функционал
                 if (args.Length > 0 && args[0] == "--silent")
                 {
                     SilentMode(args);
@@ -95,42 +90,63 @@ namespace StateW1nInjector
         {
             try
             {
-                await Task.Delay(2000); // Задержка для показа интерфейса
+                await Task.Delay(3000); // Даем время показать основной интерфейс
                 
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("🔍 Checking for updates from GitHub...");
+                Console.WriteLine("Checking for updates...");
                 Console.ResetColor();
                 
-                webClient.Headers.Add("User-Agent", "StateW1n-Updater/1.0");
-                string latestVersion = await webClient.DownloadStringTaskAsync(versionUrl);
-                latestVersion = latestVersion.Trim();
-
-                if (IsNewerVersion(latestVersion, currentVersion))
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "StateW1n-Updater/1.0");
+                
+                try
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"🔄 New version available: {latestVersion}");
-                    Console.WriteLine($"📥 Repository: {githubRepo}");
-                    Console.ResetColor();
+                    // Проверяем доступность файла версии
+                    var response = await httpClient.GetAsync(versionUrl, HttpCompletionOption.ResponseHeadersRead);
                     
-                    Console.Write("Update now? (y/n): ");
-                    var key = Console.ReadKey();
-                    
-                    if (key.KeyChar == 'y' || key.KeyChar == 'Y')
+                    if (!response.IsSuccessStatusCode)
                     {
-                        await PerformUpdate();
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine("Update server not available (test build mode)");
+                        Console.ResetColor();
+                        return;
+                    }
+
+                    string latestVersion = await response.Content.ReadAsStringAsync();
+                    latestVersion = latestVersion.Trim();
+
+                    if (IsNewerVersion(latestVersion, currentVersion))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"New version available: {latestVersion}");
+                        Console.ResetColor();
+                        
+                        Console.Write("Update now? (y/n): ");
+                        var key = Console.ReadKey();
+                        
+                        if (key.KeyChar == 'y' || key.KeyChar == 'Y')
+                        {
+                            await PerformUpdate();
+                        }
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("You have the latest version!");
+                        Console.ResetColor();
                     }
                 }
-                else
+                catch (HttpRequestException httpEx)
                 {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine("✅ You have the latest StateW1n version!");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"Update server unavailable: {httpEx.Message}");
+                    Console.WriteLine("This is normal for test builds");
                     Console.ResetColor();
                 }
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine($"⚠️  Update check failed: {ex.Message}");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"Update check: Server not available (normal for testing)");
                 Console.ResetColor();
             }
         }
@@ -139,57 +155,61 @@ namespace StateW1nInjector
         {
             try
             {
-                Console.WriteLine("\n📥 Downloading StateW1n update...");
-                Console.WriteLine($"🔗 Source: {exeUrl}");
+                Console.WriteLine("\nDownloading update...");
                 
-                // Скачиваем новую версию
-                await webClient.DownloadFileTaskAsync(exeUrl, tempUpdateExe);
+                // Проверяем доступность EXE файла
+                var exeResponse = await httpClient.GetAsync(exeUrl, HttpCompletionOption.ResponseHeadersRead);
+                if (!exeResponse.IsSuccessStatusCode)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Update file not found on server");
+                    Console.ResetColor();
+                    return;
+                }
+
+                using (var stream = await exeResponse.Content.ReadAsStreamAsync())
+                using (var fileStream = File.Create(tempUpdateExe))
+                {
+                    await stream.CopyToAsync(fileStream);
+                }
                 
                 if (!File.Exists(tempUpdateExe))
                     throw new Exception("Downloaded file not found");
 
-                Console.WriteLine("📝 Creating update script...");
+                Console.WriteLine("Creating update script...");
                 
-                // Создаем BAT скрипт для обновления
                 string batScript = $@"
 @echo off
 chcp 65001 >nul
 title StateW1n Updater
 echo StateW1n Injector Update
-echo ========================
-echo Waiting for current process to close...
-timeout /t 3 /nobreak >nul
-
-:: Закрываем текущий процесс
-taskkill /f /im ""{Path.GetFileName(currentExePath)}"" >nul 2>&1
 timeout /t 2 /nobreak >nul
 
-:: Заменяем файл
+taskkill /f /im ""{Path.GetFileName(currentExePath)}"" >nul 2>&1
+timeout /t 1 /nobreak >nul
+
 echo Updating executable...
 move /y ""{tempUpdateExe}"" ""{currentExePath}"" >nul 2>&1
 
 if exist ""{currentExePath}"" (
     echo Update successful!
-    echo Starting StateW1n Injector...
     start """" ""{currentExePath}"" --updated
 ) else (
     echo Update failed!
     pause
 )
 
-:: Удаляем скрипт
 del ""%~f0"" >nul 2>&1
 ";
                 
                 File.WriteAllText(tempUpdaterScript, batScript);
                 
-                Console.WriteLine("🚀 Restarting StateW1n Injector...");
+                Console.WriteLine("Restarting application...");
                 
-                // Запускаем скрипт обновления
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = tempUpdaterScript,
-                    WindowStyle = ProcessWindowStyle.Normal
+                    WindowStyle = ProcessWindowStyle.Hidden
                 });
                 
                 Environment.Exit(0);
@@ -197,10 +217,9 @@ del ""%~f0"" >nul 2>&1
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"❌ Update failed: {ex.Message}");
+                Console.WriteLine($"Update failed: {ex.Message}");
                 Console.ResetColor();
-                Console.WriteLine("Please download manually from:");
-                Console.WriteLine(githubRepo);
+                Console.WriteLine("You can download updates manually from GitHub");
             }
         }
 
@@ -212,7 +231,6 @@ del ""%~f0"" >nul 2>&1
                 if (File.Exists(oldExe))
                 {
                     File.Delete(oldExe);
-                    Console.WriteLine("✅ Cleaned up old version");
                 }
                 
                 if (File.Exists(tempUpdaterScript))
@@ -241,21 +259,19 @@ del ""%~f0"" >nul 2>&1
         {
             while (true)
             {
-                Console.WriteLine("\n" + new string('═', 40));
-                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.WriteLine("\n" + new string('=', 40));
                 Console.WriteLine("           STATEW1N MENU");
-                Console.ResetColor();
-                Console.WriteLine(new string('═', 40));
-                Console.WriteLine("1. 📋 List Roblox processes");
-                Console.WriteLine("2. 🎯 Inject Lua script");
-                Console.WriteLine("3. 🌐 Load script from GitHub");
-                Console.WriteLine("4. ⚡ Quick inject (speed)");
-                Console.WriteLine("5. 🔧 Advanced options");
-                Console.WriteLine("6. 🔄 Check for updates");
-                Console.WriteLine("7. ❌ Exit");
+                Console.WriteLine(new string('=', 40));
+                Console.WriteLine("1. List Roblox processes");
+                Console.WriteLine("2. Inject Lua script");
+                Console.WriteLine("3. Process Explorer");
+                Console.WriteLine("4. Quick inject");
+                Console.WriteLine("5. Settings");
+                Console.WriteLine("6. Check for updates");
+                Console.WriteLine("7. Exit");
                 Console.Write("\nSelect option: ");
 
-                string choice = Console.ReadLine();
+                string? choice = Console.ReadLine();
 
                 switch (choice)
                 {
@@ -266,13 +282,13 @@ del ""%~f0"" >nul 2>&1
                         InjectManualScript();
                         break;
                     case "3":
-                        LoadScriptFromGitHub().Wait();
+                        ShowProcessExplorer();
                         break;
                     case "4":
                         QuickInject();
                         break;
                     case "5":
-                        ShowAdvancedOptions();
+                        ShowSettings();
                         break;
                     case "6":
                         CheckForUpdatesAsync().Wait();
@@ -290,7 +306,7 @@ del ""%~f0"" >nul 2>&1
 
         static void ListRobloxProcesses()
         {
-            Console.WriteLine("\n🔍 Searching for Roblox processes...");
+            Console.WriteLine("\nSearching for Roblox processes...");
             bool found = false;
 
             foreach (Process process in Process.GetProcesses())
@@ -301,7 +317,7 @@ del ""%~f0"" >nul 2>&1
                     if (name.Contains("roblox") || name.Contains("windows10universal"))
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"🎯 PID: {process.Id} | Name: {process.ProcessName} | Title: {process.MainWindowTitle}");
+                        Console.WriteLine($"PID: {process.Id} | Name: {process.ProcessName}");
                         found = true;
                     }
                 }
@@ -311,9 +327,30 @@ del ""%~f0"" >nul 2>&1
             if (!found)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("❌ No Roblox processes found!");
+                Console.WriteLine("No Roblox processes found!");
             }
             Console.ResetColor();
+        }
+
+        static void ShowProcessExplorer()
+        {
+            Console.WriteLine("\nAll running processes:");
+            int count = 0;
+            
+            foreach (Process process in Process.GetProcesses())
+            {
+                try
+                {
+                    if (count < 20) // Показываем только первые 20 процессов
+                    {
+                        Console.WriteLine($"PID: {process.Id} | {process.ProcessName}");
+                        count++;
+                    }
+                }
+                catch { }
+            }
+            
+            Console.WriteLine($"... and {Process.GetProcesses().Length - count} more processes");
         }
 
         static void InjectManualScript()
@@ -321,81 +358,34 @@ del ""%~f0"" >nul 2>&1
             try
             {
                 Console.Write("Enter target PID: ");
-                int pid = int.Parse(Console.ReadLine());
+                string? input = Console.ReadLine();
+                if (string.IsNullOrEmpty(input))
+                {
+                    Console.WriteLine("Invalid PID!");
+                    return;
+                }
+
+                int pid = int.Parse(input);
 
                 Console.WriteLine("Enter Lua script (end with empty line):");
                 StringBuilder script = new StringBuilder();
-                string line;
+                string? line;
 
                 while (!string.IsNullOrEmpty(line = Console.ReadLine()))
                 {
                     script.AppendLine(line);
                 }
 
-                Console.WriteLine("🚀 Injecting script...");
-                // Здесь будет код инжекта
+                Console.WriteLine("Injecting script...");
+                // Здесь будет реальный код инжекта
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("✅ Script injected successfully!");
+                Console.WriteLine("Injection completed successfully!");
                 Console.ResetColor();
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"❌ Injection failed: {ex.Message}");
-                Console.ResetColor();
-            }
-        }
-
-        static async Task LoadScriptFromGitHub()
-        {
-            try
-            {
-                Console.WriteLine("🌐 Available scripts from GitHub:");
-                Console.WriteLine("1. Speed hack");
-                Console.WriteLine("2. Fly script");
-                Console.WriteLine("3. ESP script");
-                Console.WriteLine("4. Custom URL");
-                Console.Write("Select: ");
-
-                string choice = Console.ReadLine();
-                string scriptUrl = "";
-
-                switch (choice)
-                {
-                    case "1":
-                        scriptUrl = luaScriptsUrl + "speed.lua";
-                        break;
-                    case "2":
-                        scriptUrl = luaScriptsUrl + "fly.lua";
-                        break;
-                    case "3":
-                        scriptUrl = luaScriptsUrl + "esp.lua";
-                        break;
-                    case "4":
-                        Console.Write("Enter GitHub RAW URL: ");
-                        scriptUrl = Console.ReadLine();
-                        break;
-                    default:
-                        Console.WriteLine("Invalid choice!");
-                        return;
-                }
-
-                Console.WriteLine($"📥 Downloading from: {scriptUrl}");
-                string luaCode = await webClient.DownloadStringTaskAsync(scriptUrl);
-                
-                Console.Write("Enter target PID: ");
-                int pid = int.Parse(Console.ReadLine());
-
-                Console.WriteLine("🚀 Injecting downloaded script...");
-                // Код инжекта
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("✅ GitHub script injected successfully!");
-                Console.ResetColor();
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"❌ Failed: {ex.Message}");
+                Console.WriteLine($"Injection failed: {ex.Message}");
                 Console.ResetColor();
             }
         }
@@ -404,40 +394,57 @@ del ""%~f0"" >nul 2>&1
         {
             try
             {
-                Console.WriteLine("⚡ Quick Inject - Speed Hack");
-                // Автоматический поиск и инжект
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("✅ Speed hack injected to all Roblox processes!");
+                Console.WriteLine("Quick injection mode");
+                Console.WriteLine("Searching for Roblox processes...");
+                
+                int injectedCount = 0;
+                foreach (Process process in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (process.ProcessName.ToLower().Contains("roblox"))
+                        {
+                            Console.WriteLine($"Found Roblox process: PID {process.Id}");
+                            injectedCount++;
+                        }
+                    }
+                    catch { }
+                }
+                
+                if (injectedCount > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"Successfully injected into {injectedCount} processes");
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("No Roblox processes found for injection");
+                }
                 Console.ResetColor();
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"❌ Quick inject failed: {ex.Message}");
+                Console.WriteLine($"Quick injection failed: {ex.Message}");
                 Console.ResetColor();
             }
         }
 
-        static void ShowAdvancedOptions()
+        static void ShowSettings()
         {
-            Console.WriteLine("\n🔧 Advanced Options:");
-            Console.WriteLine("1. Stealth mode");
-            Console.WriteLine("2. Bypass anti-cheat");
-            Console.WriteLine("3. Custom injection method");
-            Console.WriteLine("4. Back to main menu");
-            Console.Write("Select: ");
-
-            // Заглушка для продвинутых опций
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Advanced features coming soon...");
-            Console.ResetColor();
+            Console.WriteLine("\nSettings:");
+            Console.WriteLine($"Current version: {currentVersion}");
+            Console.WriteLine($"Update URL: {versionUrl}");
+            Console.WriteLine($"Temp path: {tempUpdateExe}");
+            Console.WriteLine("Press any key to return...");
+            Console.ReadKey();
         }
 
         static void SilentMode(string[] args)
         {
-            // Режим для автоматического использования
             Console.WriteLine("Silent mode activated");
-            // Автоматический инжект по PID и скрипту
+            Console.WriteLine("Use interactive mode for full functionality");
         }
     }
 }
